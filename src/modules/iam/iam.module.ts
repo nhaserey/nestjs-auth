@@ -12,16 +12,21 @@ import { AccessTokenGuard } from './authentication/guards/access-token.guard';
 import { AuthenticationGuard } from './authentication/guards/authentication.guard';
 import { RefreshTokenIdsStorage } from './authentication/refresh-token-ids.storage';
 import { RolesGuard } from './authorization/guards/roles.guard';
-import { PermissionsGuard } from "./authorization/guards/permissions.guard";
-import { PolicyHandlersStorage } from "./authorization/policies/policy-handlers.storage";
-import { PoliciesGuard } from "./authorization/guards/policies.guard";
+import { PermissionsGuard } from './authorization/guards/permissions.guard';
+import { PolicyHandlersStorage } from './authorization/policies/policy-handlers.storage';
+import { PoliciesGuard } from './authorization/guards/policies.guard';
+import { ApiKeysService } from './authentication/api-keys.service';
+import { ApiKeyGuard } from './authentication/guards/api-key.guard';
+import { GoogleAuthenticationService } from './authentication/socials/google-authentication.service';
+import { GoogleAuthenticationController } from './authentication/socials/google-authentication.controller';
+import { OtpAuthenticationService } from './authentication/otp-authentication.service';
 
 @Module({
   imports: [
     JwtModule.registerAsync(jwtConfig.asProvider()),
     ConfigModule.forFeature(jwtConfig),
   ],
-  controllers: [AuthenticationController],
+  controllers: [AuthenticationController, GoogleAuthenticationController],
   providers: [
     {
       provide: HashingService,
@@ -33,13 +38,25 @@ import { PoliciesGuard } from "./authorization/guards/policies.guard";
     },
     {
       provide: APP_GUARD,
+      useClass: RolesGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: PermissionsGuard,
+    },
+    {
+      provide: APP_GUARD,
       useClass: PoliciesGuard, // PermissionsGuard, //RolesGuard,
     },
     PrismaService,
     AccessTokenGuard,
+    ApiKeyGuard,
     RefreshTokenIdsStorage,
     AuthenticationService,
     PolicyHandlersStorage,
+    ApiKeysService,
+    GoogleAuthenticationService,
+    OtpAuthenticationService,
   ],
 })
 export class IamModule {}

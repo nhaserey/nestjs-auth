@@ -44,22 +44,34 @@ enum Permission {
 }
 
 model User {
-  id                    String                 @id @default(cuid())
-  name                  String
-  email                 String?                @unique
-  emailVerified         DateTime?
-  image                 String?
-  password              String?
-  role                  UserRole               @default(UNKNOW)
-  permissions           Permission[]           @default([])
-  gender                UserGender             @default(UNKNOW)
-  isTwoFactorEnabled    Boolean                @default(false)
-  twoFactorConfirmation TwoFactorConfirmation?
-  status                UserStatus             @default(UNKNOW)
+  id                 String       @id @default(uuid())
+  name               String
+  email              String?      @unique
+  emailVerified      DateTime?
+  image              String?
+  password           String?
+  role               UserRole     @default(UNKNOW)
+  permissions        Permission[] @default([])
+  gender             UserGender   @default(UNKNOW)
+  isTwoFactorEnabled Boolean      @default(false)
+  twoFactorSecret    String?
+  status             UserStatus   @default(UNKNOW)
+  googleId           String?
+
+  apiKey ApiKey[]
+}
+
+model ApiKey {
+  id        String   @id @default(uuid())
+  key       String
+  uuid      String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime
 }
 
 model VerificationToken {
-  id      String   @id @default(cuid())
+  id      String   @id @default(uuid())
   email   String
   token   String   @unique
   expires DateTime
@@ -68,28 +80,10 @@ model VerificationToken {
 }
 
 model PasswordResetToken {
-  id      String   @id @default(cuid())
+  id      String   @id @default(uuid())
   email   String
   token   String   @unique
   expires DateTime
 
   @@unique([email, token])
-}
-
-model TwoFactorToken {
-  id      String   @id @default(cuid())
-  email   String
-  token   String   @unique
-  expires DateTime
-
-  @@unique([email, token])
-}
-
-model TwoFactorConfirmation {
-  id String @id @default(cuid())
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId])
 }
