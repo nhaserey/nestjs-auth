@@ -19,7 +19,6 @@ import { Response } from 'express';
 import { OtpAuthenticationService } from './otp-authentication.service';
 import { toFileStream } from 'qrcode';
 
-@Auth(AuthType.None)
 @Controller('authentication')
 export class AuthenticationController {
   constructor(
@@ -43,20 +42,21 @@ export class AuthenticationController {
   @Public()
   @Post('refresh-tokens')
   async refreshToken(@Body() refreshToken: RefreshTokenDto) {
-    return this.authenticationService.refreshToken(refreshToken);
+    return this.authenticationService.refreshTokens(refreshToken);
   }
 
   @Auth(AuthType.Bearer)
   @HttpCode(HttpStatus.OK)
   @Post('2fa/generate')
   async generate2FAQrCode(
-    @ActiveUser() activeUser: ActiveUserData,
+    @ActiveUser() user: ActiveUserData,
     @Res() response: Response,
   ) {
+    console.log('generate2FAQrCode', user);
     const { secret, uri } = await this.otpAuthService.generateSecret(
-      activeUser.email,
+      user.email,
     );
-    await this.otpAuthService.enableTwoFactorForUser(activeUser.email, secret);
+    await this.otpAuthService.enableTwoFactorForUser(user.email, secret);
     response.type('png');
     return toFileStream(response, uri);
   }

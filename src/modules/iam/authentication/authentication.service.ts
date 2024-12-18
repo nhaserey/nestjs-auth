@@ -1,4 +1,4 @@
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { HashingService } from '../hashing/hashing.service';
 import { SignUpDto } from './dto/sign-up.dto';
@@ -17,6 +17,8 @@ import { randomUUID } from 'node:crypto';
 
 @Injectable()
 export class AuthenticationService {
+  private readonly logger = new Logger(AuthenticationService.name);
+  
   constructor(
     private readonly prisma: PrismaService,
     private readonly hashing: HashingService,
@@ -85,7 +87,7 @@ export class AuthenticationService {
     };
   }
 
-  async refreshToken(refreshTokenDto: RefreshTokenDto) {
+  async refreshTokens(refreshTokenDto: RefreshTokenDto) {
     try {
       const { sub, refreshTokenId } = await this.jwtService.verifyAsync<
         Pick<ActiveUserData, 'sub'> & { refreshTokenId: string }
@@ -94,18 +96,17 @@ export class AuthenticationService {
         audience: this.jwtConfiguration.audience,
         issuer: this.jwtConfiguration.issuer,
       });
+      this.logger.log(`Token verified for user ${sub}`);
       const user = await this.prisma.user.findUnique({ where: { id: sub } });
-      const isValid = await this.refreshTokenIdStorage.validate(
-        user.id,
-        refreshTokenId,
-      );
+      this.logger.log(`User found: ${user.email}`);
+      const isValid = await this.refreshTokenIdStorage.validate(user.id, refreshTokenId);
       if (!isValid) {
         await this.refreshTokenIdStorage.invalidate(user.id);
-      } else {
-        throw new UnauthorizedException();
+        throw new UnauthorizedException('Access denied');
       }
       return await this.generateToken(user);
     } catch (error) {
+      this.logger.error('Error refreshing token', error);
       if (error instanceof InvalidatedRefreshTokenError) {
         throw new UnauthorizedException('Access denied');
       }
