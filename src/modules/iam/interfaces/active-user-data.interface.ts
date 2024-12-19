@@ -1,8 +1,9 @@
-import { UserRole, Permission } from '@prisma/client';
+import { User } from '@prisma/client';
+import { Request } from 'express';
 
 export interface ActiveUserData {
   sub: string;
   email: string;
-  role: UserRole;
-  permissions: Permission[];
+  role: string;
+  permissions?: string[];
 }

@@ -28,16 +28,15 @@ export class AccessTokenGuard implements CanActivate {
       throw new UnauthorizedException();
     }
     try {
-      const payload = await this.jwtService.verify(
+      const payload = await this.jwtService.verifyAsync(
         token,
         this.jwtConfiguration,
       );
       request[REQUEST_USER_KEY] = payload;
-      this.Logger.log(`User ${payload} authenticated`);
-      return true;
     } catch {
       throw new UnauthorizedException();
     }
+    return true;
   }
 
   private extractTokenFromHeader(request: Request): string | undefined {

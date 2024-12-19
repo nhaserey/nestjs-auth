@@ -13,6 +13,7 @@ import { ApiKeyGuard } from './api-key.guard';
 @Injectable()
 export class AuthenticationGuard implements CanActivate {
   private static readonly defaultAuthType = AuthType.Bearer;
+
   private readonly authTypeGuardMap: Record<
     AuthType,
     CanActivate | CanActivate[]
@@ -21,6 +22,7 @@ export class AuthenticationGuard implements CanActivate {
     [AuthType.ApiKey]: this.apiKeyGuard,
     [AuthType.None]: { canActivate: () => true },
   };
+
   constructor(
     private readonly reflector: Reflector,
     private readonly accessTokenGuard: AccessTokenGuard,
@@ -41,7 +43,7 @@ export class AuthenticationGuard implements CanActivate {
       ).catch((err) => {
         error = err;
       });
-      if (!canActivate) {
+      if (canActivate) {
         return true;
       }
     }

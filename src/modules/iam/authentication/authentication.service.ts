@@ -1,4 +1,9 @@
-import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { HashingService } from '../hashing/hashing.service';
 import { SignUpDto } from './dto/sign-up.dto';
@@ -6,7 +11,6 @@ import { SignInDto } from './dto/sign-in.dto';
 import { JwtService } from '@nestjs/jwt';
 import jwtConfig from 'src/modules/iam/config/jwt.config';
 import { ConfigType } from '@nestjs/config';
-import { ActiveUserData } from '../interfaces/active-user-data.interface';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import {
   InvalidatedRefreshTokenError,
@@ -14,11 +18,12 @@ import {
 } from './refresh-token-ids.storage';
 import { User } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
+import { OtpAuthenticationService } from './otp-authentication.service';
 
 @Injectable()
 export class AuthenticationService {
   private readonly logger = new Logger(AuthenticationService.name);
-  
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly hashing: HashingService,
@@ -26,6 +31,7 @@ export class AuthenticationService {
     @Inject(jwtConfig.KEY)
     private readonly jwtConfiguration: ConfigType<typeof jwtConfig>,
     private readonly refreshTokenIdStorage: RefreshTokenIdsStorage,
+    private readonly otpAuthService: OtpAuthenticationService,
   ) {}
 
   async signUp(signUpDto: SignUpDto) {
@@ -58,6 +64,15 @@ export class AuthenticationService {
         user.password,
       );
       if (!isPasswordValid) throw new Error('Invalid password');
+      if (user.isTwoFactorEnabled) {
+        const isValid = this.otpAuthService.verifyCode(
+          singInDto.tfaCode,
+          user.twoFactorSecret,
+        );
+        if (!isValid) {
+          throw new UnauthorizedException('Invalid 2FA code');
+        }
+      }
       return await this.generateToken(user);
     } catch (error) {
       throw error;
@@ -67,14 +82,10 @@ export class AuthenticationService {
   async generateToken(user: User) {
     const refreshTokenId = randomUUID();
     const [accessToken, refreshToken] = await Promise.all([
-      this.signToken<Partial<ActiveUserData>>(
+      this.signToken<Partial<User>>(
         user.id,
         this.jwtConfiguration.accessTokenTtl,
-        {
-          email: user.email,
-          role: user.role,
-          permissions: user.permissions,
-        },
+        user,
       ),
       this.signToken(user.id, this.jwtConfiguration.refreshTokenTtl, {
         refreshTokenId,
@@ -89,17 +100,26 @@ export class AuthenticationService {
 
   async refreshTokens(refreshTokenDto: RefreshTokenDto) {
     try {
-      const { sub, refreshTokenId } = await this.jwtService.verifyAsync<
-        Pick<ActiveUserData, 'sub'> & { refreshTokenId: string }
-      >(refreshTokenDto.refreshToken, {
-        secret: this.jwtConfiguration.secret,
-        audience: this.jwtConfiguration.audience,
-        issuer: this.jwtConfiguration.issuer,
+      const { sub: userId, refreshTokenId } =
+        await this.jwtService.verifyAsync<{
+          sub: string;
+          refreshTokenId: string;
+        }>(refreshTokenDto.refreshToken, {
+          secret: this.jwtConfiguration.secret,
+          audience: this.jwtConfiguration.audience,
+          issuer: this.jwtConfiguration.issuer,
+        });
+
+      this.logger.log(`Token verified for user ${userId}`);
+
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
       });
-      this.logger.log(`Token verified for user ${sub}`);
-      const user = await this.prisma.user.findUnique({ where: { id: sub } });
       this.logger.log(`User found: ${user.email}`);
-      const isValid = await this.refreshTokenIdStorage.validate(user.id, refreshTokenId);
+      const isValid = await this.refreshTokenIdStorage.validate(
+        user.id,
+        refreshTokenId,
+      );
       if (!isValid) {
         await this.refreshTokenIdStorage.invalidate(user.id);
         throw new UnauthorizedException('Access denied');

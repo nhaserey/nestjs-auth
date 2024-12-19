@@ -4,6 +4,7 @@ import {
   IsBoolean,
   IsOptional,
   MinLength,
+  IsNumberString,
 } from 'class-validator';
 
 export class SignInDto {
@@ -17,4 +18,8 @@ export class SignInDto {
   @IsOptional()
   @IsBoolean()
   rememberMe?: boolean;
+
+  @IsOptional()
+  @IsNumberString()
+  tfaCode?: string;
 }

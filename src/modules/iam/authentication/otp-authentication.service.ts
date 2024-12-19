@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma';
 import { authenticator } from 'otplib';
@@ -13,22 +13,13 @@ export class OtpAuthenticationService {
   ) {}
 
   async generateSecret(email: string) {
-    if (!email) {
-      throw new UnauthorizedException('User email required');
-    }
-    const user = await this.prisma.user.findUnique({
-      where: { email }
-    });
-
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
     const secret = authenticator.generateSecret();
     const appName = this.configService.getOrThrow('TFA_APP_NAME');
     const uri = authenticator.keyuri(email, appName, secret);
+    this.logger.log(`Generated 2FA secret for user ${email}`);
     return {
-      uri,
       secret,
+      uri,
     };
   }
 
