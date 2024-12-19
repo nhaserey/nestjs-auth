@@ -23,15 +23,6 @@ export class SessionAuthenticationService {
         user.password,
       );
       if (!isEqual) throw new UnauthorizedException('Invalid password');
-      if (user.isTwoFactorEnabled) {
-        const isValid = this.otpAuthService.verifyCode(
-          signInDto.tfaCode,
-          user.twoFactorSecret,
-        );
-        if (!isValid) {
-          throw new UnauthorizedException('Invalid 2FA code');
-        }
-      }
       return user;
     } catch (error) {
       throw error;
